@@ -1,0 +1,32 @@
+# Production stack for DigitalOcean — does not touch other projects.
+# App: http://<host>:3010
+services:
+  mongo:
+    image: mongo:8
+    container_name: pricing-mongo
+    restart: unless-stopped
+    volumes:
+      - pricing-mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: pricing-app
+    restart: unless-stopped
+    ports:
+      - "3010:3000"
+    environment:
+      MONGODB_URI: mongodb://mongo:27017
+      MONGODB_DB: pricing
+      SESSION_SECRET: ${SESSION_SECRET}
+      NODE_ENV: production
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+volumes:
+  pricing-mongo-data:
