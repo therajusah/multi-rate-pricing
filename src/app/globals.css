@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-zinc-50 text-zinc-900 antialiased;
+}
+
+@utility field {
+  @apply w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-xs
+    outline-none transition placeholder:text-zinc-400
+    focus:border-zinc-900 focus:ring-2 focus:ring-zinc-900/10
+    disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-500;
+}
+
+/* Native select chevrons ignore padding; custom arrow keeps space from the edge. */
+select.field {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2371717a' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m19 9-7 7-7-7'/%3E%3C/svg%3E");
+  background-position: right 0.75rem center;
+  background-repeat: no-repeat;
+  background-size: 1rem 1rem;
+  padding-right: 2rem;
+}
+
+@utility label {
+  @apply mb-1.5 block text-xs font-medium text-zinc-600;
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2 text-sm
+    font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+@utility btn-primary {
+  @apply bg-zinc-900 text-white hover:bg-zinc-700;
+}
+
+@utility btn-secondary {
+  @apply border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-100;
+}
+
+@utility btn-danger {
+  @apply border border-red-200 bg-white text-red-700 hover:bg-red-50;
+}
+
+@utility card {
+  @apply rounded-xl border border-zinc-200 bg-white shadow-xs;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    @apply bg-white;
+  }
+}
