@@ -317,9 +317,10 @@ The Mongo client is cached on `globalThis`, so warm serverless invocations reuse
 the connection pool instead of opening one per request.
 
 **DigitalOcean App Platform** (or any container host): the included
-`Dockerfile` builds the Next standalone output. Point App Platform at the repo,
-choose Dockerfile as the build strategy, expose port 3000 and set the same three
-environment variables.
+`Dockerfile` sets `DOCKER_BUILD=true` so Next emits standalone output. Vercel
+builds omit standalone (it breaks their NFT tracing step). Point App Platform
+at the repo, choose Dockerfile as the build strategy, expose port 3000 and set
+the same three environment variables.
 
 ---
 

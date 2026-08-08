@@ -11,6 +11,8 @@ import { ErrorBox } from "./ErrorBox";
 import { TotalsSummary } from "./DocumentView";
 
 type DiscountKind = "none" | "percent" | "fixed";
+type FieldKey = "description" | "quantity" | "unitPrice" | "discountValue" | "taxPercent";
+type RowErrors = Partial<Record<FieldKey, string>>;
 
 interface Row {
   key: string;
@@ -82,6 +84,76 @@ function toCalcInput(row: Row): LineInput {
   };
 }
 
+function stripLeadingMinus(value: string) {
+  return value.replace(/^-+/, "");
+}
+
+function fieldError(row: Row, field: FieldKey): string | undefined {
+  switch (field) {
+    case "description":
+      return row.description.trim() ? undefined : "Description is required";
+    case "quantity": {
+      if (row.quantity.trim() === "") return "Quantity must be at least 1";
+      const quantity = Number(row.quantity);
+      if (!Number.isFinite(quantity)) return "Quantity must be a number";
+      if (!Number.isInteger(quantity)) return "Quantity must be a whole number";
+      if (quantity < 1) return "Quantity must be at least 1";
+      return undefined;
+    }
+    case "unitPrice": {
+      if (row.unitPrice.trim() === "") return "Unit price is required";
+      const cents = parseScaled2(row.unitPrice);
+      if (cents === null) {
+        return "Unit price must be a number with at most 2 decimal places";
+      }
+      if (cents < 0) return "Unit price must be 0 or greater";
+      return undefined;
+    }
+    case "discountValue": {
+      if (row.discountKind === "none" || row.discountValue.trim() === "") return undefined;
+      const label = row.discountKind === "percent" ? "Discount percent" : "Discount amount";
+      const value = parseScaled2(row.discountValue);
+      if (value === null) {
+        return `${label} must be a number with at most 2 decimal places`;
+      }
+      if (value < 0) return `${label} must be 0 or greater`;
+      if (row.discountKind === "percent" && value > 10_000) {
+        return "Discount percent must be between 0 and 100";
+      }
+      return undefined;
+    }
+    case "taxPercent": {
+      if (row.taxPercent.trim() === "") return undefined;
+      const value = parseScaled2(row.taxPercent);
+      if (value === null) {
+        return "Tax percent must be a number with at most 2 decimal places";
+      }
+      if (value < 0 || value > 10_000) return "Tax percent must be between 0 and 100";
+      return undefined;
+    }
+  }
+}
+
+function validateRow(row: Row): RowErrors {
+  const errors: RowErrors = {};
+  for (const field of [
+    "description",
+    "quantity",
+    "unitPrice",
+    "discountValue",
+    "taxPercent",
+  ] as FieldKey[]) {
+    const message = fieldError(row, field);
+    if (message) errors[field] = message;
+  }
+  return errors;
+}
+
+function FieldMessage({ message }: { message?: string }) {
+  if (!message) return null;
+  return <p className="mt-1 text-xs text-red-600">{message}</p>;
+}
+
 export function DocumentEditor({ document: initial }: { document?: DocumentJson }) {
   const router = useRouter();
   const [saved, setSaved] = useState<DocumentJson | undefined>(initial);
@@ -91,6 +163,7 @@ export function DocumentEditor({ document: initial }: { document?: DocumentJson 
     initial?.issueDate ?? new Date().toISOString().slice(0, 10),
   );
   const [rows, setRows] = useState<Row[]>(initial ? initial.lines.map(toRow) : [emptyRow()]);
+  const [errors, setErrors] = useState<Record<string, RowErrors>>({});
   const [dirty, setDirty] = useState(!initial);
   const [error, setError] = useState<ApiClientError | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -104,8 +177,49 @@ export function DocumentEditor({ document: initial }: { document?: DocumentJson 
   }, [rows]);
 
   function edit(key: string, patch: Partial<Row>) {
-    setRows((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)));
+    setRows((current) =>
+      current.map((row) => {
+        if (row.key !== key) return row;
+        const updated = { ...row, ...patch };
+        setErrors((errs) => {
+          const existing = errs[key];
+          if (!existing) return errs;
+          const nextErrors = { ...existing };
+          for (const field of Object.keys(existing) as FieldKey[]) {
+            const message = fieldError(updated, field);
+            if (message) nextErrors[field] = message;
+            else delete nextErrors[field];
+          }
+          return { ...errs, [key]: nextErrors };
+        });
+        return updated;
+      }),
+    );
     setDirty(true);
+  }
+
+  function blur(key: string, field: FieldKey) {
+    const row = rows.find((item) => item.key === key);
+    if (!row) return;
+    const message = fieldError(row, field);
+    setErrors((current) => {
+      const next = { ...(current[key] ?? {}) };
+      if (message) next[field] = message;
+      else delete next[field];
+      return { ...current, [key]: next };
+    });
+  }
+
+  function validateAll(): boolean {
+    const next: Record<string, RowErrors> = {};
+    let ok = true;
+    for (const row of rows) {
+      const rowErrors = validateRow(row);
+      next[row.key] = rowErrors;
+      if (Object.keys(rowErrors).length > 0) ok = false;
+    }
+    setErrors(next);
+    return ok;
   }
 
   async function run(label: string, action: () => Promise<void>) {
@@ -129,6 +243,7 @@ export function DocumentEditor({ document: initial }: { document?: DocumentJson 
 
     setSaved(result);
     setRows(result.lines.map(toRow));
+    setErrors({});
     setDirty(false);
     return result;
   }
@@ -206,98 +321,147 @@ export function DocumentEditor({ document: initial }: { document?: DocumentJson 
           <table className="w-full min-w-3xl text-sm">
             <thead className="text-left text-xs uppercase tracking-wide text-zinc-500">
               <tr>
-                <th className="pb-2 pr-3 font-medium">Description</th>
-                <th className="px-3 pb-2 font-medium">Qty</th>
-                <th className="px-3 pb-2 font-medium">Unit price</th>
+                <th className="pb-2 pr-3 font-medium">
+                  Description <span className="text-red-600">*</span>
+                </th>
+                <th className="px-3 pb-2 font-medium">
+                  Qty <span className="text-red-600">*</span>
+                </th>
+                <th className="px-3 pb-2 font-medium">
+                  Unit price <span className="text-red-600">*</span>
+                </th>
                 <th className="px-3 pb-2 font-medium">Discount</th>
                 <th className="px-3 pb-2 font-medium">Tax %</th>
                 <th className="pb-2 pl-3" />
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
-                <tr key={row.key} className="align-top">
-                  <td className="py-1.5 pr-3">
-                    <input
-                      className="field"
-                      aria-label="Description"
-                      value={row.description}
-                      placeholder="Widget A"
-                      onChange={(event) => edit(row.key, { description: event.target.value })}
-                    />
-                  </td>
-                  <td className="px-3 py-1.5">
-                    <input
-                      className="field w-20"
-                      aria-label="Quantity"
-                      inputMode="numeric"
-                      value={row.quantity}
-                      onChange={(event) => edit(row.key, { quantity: event.target.value })}
-                    />
-                  </td>
-                  <td className="px-3 py-1.5">
-                    <input
-                      className="field w-28"
-                      aria-label="Unit price"
-                      inputMode="decimal"
-                      placeholder="0.00"
-                      value={row.unitPrice}
-                      onChange={(event) => edit(row.key, { unitPrice: event.target.value })}
-                    />
-                  </td>
-                  <td className="px-3 py-1.5">
-                    <div className="flex gap-1.5">
-                      <select
-                        className="field w-28"
-                        aria-label="Discount type"
-                        value={row.discountKind}
-                        onChange={(event) =>
-                          edit(row.key, {
-                            discountKind: event.target.value as DiscountKind,
-                            discountValue: "",
-                          })
-                        }
-                      >
-                        <option value="none">None</option>
-                        <option value="percent">Percent</option>
-                        <option value="fixed">Fixed</option>
-                      </select>
+              {rows.map((row) => {
+                const rowErrors = errors[row.key] ?? {};
+                return (
+                  <tr key={row.key} className="align-top">
+                    <td className="py-1.5 pr-3">
                       <input
-                        className="field w-24"
-                        aria-label="Discount value"
-                        inputMode="decimal"
-                        placeholder={row.discountKind === "percent" ? "10" : "20.00"}
-                        disabled={row.discountKind === "none"}
-                        value={row.discountValue}
-                        onChange={(event) => edit(row.key, { discountValue: event.target.value })}
+                        className="field"
+                        aria-label="Description"
+                        aria-invalid={Boolean(rowErrors.description)}
+                        value={row.description}
+                        placeholder="Widget A"
+                        onChange={(event) => edit(row.key, { description: event.target.value })}
+                        onBlur={() => blur(row.key, "description")}
                       />
-                    </div>
-                  </td>
-                  <td className="px-3 py-1.5">
-                    <input
-                      className="field w-20"
-                      aria-label="Tax percent"
-                      inputMode="decimal"
-                      placeholder="0"
-                      value={row.taxPercent}
-                      onChange={(event) => edit(row.key, { taxPercent: event.target.value })}
-                    />
-                  </td>
-                  <td className="py-1.5 pl-3">
-                    <button
-                      type="button"
-                      className="btn btn-secondary px-2 py-2"
-                      aria-label="Remove line"
-                      onClick={() => {
-                        setRows((current) => current.filter((item) => item.key !== row.key));
-                        setDirty(true);
-                      }}
-                    >
-                      ✕
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                      <FieldMessage message={rowErrors.description} />
+                    </td>
+                    <td className="px-3 py-1.5">
+                      <input
+                        className="field w-20"
+                        aria-label="Quantity"
+                        aria-invalid={Boolean(rowErrors.quantity)}
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        step={1}
+                        value={row.quantity}
+                        onChange={(event) => {
+                          const value = stripLeadingMinus(event.target.value);
+                          if (value === "" || /^\d+$/.test(value)) {
+                            edit(row.key, { quantity: value });
+                          }
+                        }}
+                        onBlur={() => blur(row.key, "quantity")}
+                      />
+                      <FieldMessage message={rowErrors.quantity} />
+                    </td>
+                    <td className="px-3 py-1.5">
+                      <input
+                        className="field w-28"
+                        aria-label="Unit price"
+                        aria-invalid={Boolean(rowErrors.unitPrice)}
+                        inputMode="decimal"
+                        min={0}
+                        placeholder="0.00"
+                        value={row.unitPrice}
+                        onChange={(event) =>
+                          edit(row.key, { unitPrice: stripLeadingMinus(event.target.value) })
+                        }
+                        onBlur={() => blur(row.key, "unitPrice")}
+                      />
+                      <FieldMessage message={rowErrors.unitPrice} />
+                    </td>
+                    <td className="px-3 py-1.5">
+                      <div className="flex gap-1.5">
+                        <select
+                          className="field w-28"
+                          aria-label="Discount type"
+                          value={row.discountKind}
+                          onChange={(event) =>
+                            edit(row.key, {
+                              discountKind: event.target.value as DiscountKind,
+                              discountValue: "",
+                            })
+                          }
+                        >
+                          <option value="none">None</option>
+                          <option value="percent">Percent</option>
+                          <option value="fixed">Fixed</option>
+                        </select>
+                        <input
+                          className="field w-24"
+                          aria-label="Discount value"
+                          aria-invalid={Boolean(rowErrors.discountValue)}
+                          inputMode="decimal"
+                          min={0}
+                          placeholder={row.discountKind === "percent" ? "10" : "20.00"}
+                          disabled={row.discountKind === "none"}
+                          value={row.discountValue}
+                          onChange={(event) =>
+                            edit(row.key, {
+                              discountValue: stripLeadingMinus(event.target.value),
+                            })
+                          }
+                          onBlur={() => blur(row.key, "discountValue")}
+                        />
+                      </div>
+                      <FieldMessage message={rowErrors.discountValue} />
+                    </td>
+                    <td className="px-3 py-1.5">
+                      <input
+                        className="field w-20"
+                        aria-label="Tax percent"
+                        aria-invalid={Boolean(rowErrors.taxPercent)}
+                        inputMode="decimal"
+                        min={0}
+                        max={100}
+                        placeholder="0"
+                        value={row.taxPercent}
+                        onChange={(event) =>
+                          edit(row.key, { taxPercent: stripLeadingMinus(event.target.value) })
+                        }
+                        onBlur={() => blur(row.key, "taxPercent")}
+                      />
+                      <FieldMessage message={rowErrors.taxPercent} />
+                    </td>
+                    <td className="py-1.5 pl-3">
+                      <button
+                        type="button"
+                        className="btn btn-secondary px-2 py-2"
+                        aria-label="Remove line"
+                        onClick={() => {
+                          setRows((current) => current.filter((item) => item.key !== row.key));
+                          setErrors((current) => {
+                            const next = { ...current };
+                            delete next[row.key];
+                            return next;
+                          });
+                          setDirty(true);
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -336,6 +500,7 @@ export function DocumentEditor({ document: initial }: { document?: DocumentJson 
           disabled={busy !== null}
           onClick={() =>
             run("save", async () => {
+              if (!validateAll()) return;
               const result = await persist();
               if (isNew) router.replace(`/documents/${result.id}`);
               router.refresh();
@@ -353,6 +518,7 @@ export function DocumentEditor({ document: initial }: { document?: DocumentJson 
               disabled={busy !== null}
               onClick={() =>
                 run("finalize", async () => {
+                  if (!validateAll()) return;
                   const result = await persist();
                   await documentApi.finalize(result.id);
                   router.refresh();

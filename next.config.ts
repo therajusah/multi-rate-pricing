@@ -1,8 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Standalone output keeps the Docker/DigitalOcean image small; Vercel ignores it.
-  output: "standalone",
+  ...(process.env.DOCKER_BUILD === "true" ? { output: "standalone" as const } : {}),
   agentRules: false,
 };
 
