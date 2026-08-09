@@ -30,10 +30,12 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
         <PrintButton />
       </div>
 
-      <article className="card p-8 print:border-0 print:shadow-none">
-        <header className="mb-6 flex items-start justify-between">
+      <article className="card p-8 print:border-0 print:p-0 print:shadow-none">
+        <header className="mb-6 flex items-start justify-between print:mb-3">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">{document.title}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight print:text-xl">
+              {document.title}
+            </h1>
             <p className="mt-1 text-sm text-zinc-500">Prepared for {document.customer}</p>
           </div>
           <p className="text-sm text-zinc-500">Issued {document.issueDate}</p>

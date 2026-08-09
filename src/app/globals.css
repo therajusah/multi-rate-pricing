@@ -55,6 +55,11 @@ select.field {
   @apply rounded-xl border border-zinc-200 bg-white shadow-xs;
 }
 
+@page {
+  size: A4 landscape;
+  margin: 12mm;
+}
+
 @media print {
   .no-print {
     display: none !important;
@@ -62,5 +67,56 @@ select.field {
 
   body {
     @apply bg-white;
+  }
+
+  /* Screen max-width / padding crop wide tables when printing. */
+  main {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .card {
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+  }
+
+  .overflow-x-auto {
+    overflow: visible !important;
+  }
+
+  /* min-w-* forces horizontal overflow that print clips. */
+  table.min-w-2xl,
+  table.min-w-3xl {
+    min-width: 0 !important;
+    width: 100% !important;
+    table-layout: fixed;
+    font-size: 10.5px;
+  }
+
+  table.min-w-2xl th,
+  table.min-w-2xl td,
+  table.min-w-3xl th,
+  table.min-w-3xl td {
+    padding-top: 0.2rem !important;
+    padding-bottom: 0.2rem !important;
+    padding-left: 0.35rem !important;
+    padding-right: 0.35rem !important;
+  }
+
+  table.min-w-2xl th:first-child,
+  table.min-w-2xl td:first-child,
+  table.min-w-3xl th:first-child,
+  table.min-w-3xl td:first-child {
+    width: 26%;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+
+  table.min-w-2xl thead,
+  table.min-w-3xl thead {
+    font-size: 9px;
   }
 }
