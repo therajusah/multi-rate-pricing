@@ -41,7 +41,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
           <p className="text-sm text-zinc-500">Issued {document.issueDate}</p>
         </header>
 
-        <DocumentView document={document} showMeta={false} />
+        <DocumentView document={document} showMeta={false} compactHeaders />
 
         <footer className="mt-8 border-t border-zinc-200 pt-4 text-xs text-zinc-500">
           All amounts are rounded to 2 decimal places per line; tax is applied to the discounted

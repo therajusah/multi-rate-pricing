@@ -15,9 +15,11 @@ function describeDiscount(discount: DocumentJson["lines"][number]["discount"]) {
 export function DocumentView({
   document: doc,
   showMeta = true,
+  compactHeaders = false,
 }: {
   document: DocumentJson;
   showMeta?: boolean;
+  compactHeaders?: boolean;
 }) {
   return (
     <div className="space-y-6">
@@ -42,22 +44,18 @@ export function DocumentView({
               <th className="py-2 pr-3 font-medium">Description</th>
               <th className="px-3 py-2 text-right font-medium">Qty</th>
               <th className="px-3 py-2 text-right font-medium">
-                <span className="print:hidden">Unit price</span>
-                <span className="hidden print:inline">Unit</span>
+                {compactHeaders ? "Unit" : "Unit price"}
               </th>
               <th className="px-3 py-2 text-right font-medium">
-                <span className="print:hidden">Discount</span>
-                <span className="hidden print:inline">Disc</span>
+                {compactHeaders ? "Disc" : "Discount"}
               </th>
               <th className="px-3 py-2 text-right font-medium">
-                <span className="print:hidden">Discount amt</span>
-                <span className="hidden print:inline">Disc amt</span>
+                {compactHeaders ? "Disc amt" : "Discount amt"}
               </th>
               <th className="px-3 py-2 text-right font-medium">Tax</th>
               <th className="px-3 py-2 text-right font-medium">Tax amt</th>
               <th className="py-2 pl-3 text-right font-medium">
-                <span className="print:hidden">Line total</span>
-                <span className="hidden print:inline">Total</span>
+                {compactHeaders ? "Total" : "Line total"}
               </th>
             </tr>
           </thead>

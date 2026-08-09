@@ -57,7 +57,7 @@ select.field {
 
 @page {
   size: A4 landscape;
-  margin: 12mm;
+  margin: 10mm;
 }
 
 @media print {
@@ -87,36 +87,45 @@ select.field {
     overflow: visible !important;
   }
 
-  /* min-w-* forces horizontal overflow that print clips. */
+
   table.min-w-2xl,
   table.min-w-3xl {
     min-width: 0 !important;
     width: 100% !important;
     table-layout: fixed;
-    font-size: 10.5px;
+    font-size: 9.5px;
   }
 
   table.min-w-2xl th,
   table.min-w-2xl td,
   table.min-w-3xl th,
   table.min-w-3xl td {
-    padding-top: 0.2rem !important;
-    padding-bottom: 0.2rem !important;
-    padding-left: 0.35rem !important;
-    padding-right: 0.35rem !important;
+    padding-top: 0.15rem !important;
+    padding-bottom: 0.15rem !important;
+    padding-left: 0.2rem !important;
+    padding-right: 0.2rem !important;
+  }
+
+  table.min-w-2xl thead,
+  table.min-w-3xl thead {
+    font-size: 8.5px;
+    letter-spacing: 0 !important;
   }
 
   table.min-w-2xl th:first-child,
   table.min-w-2xl td:first-child,
   table.min-w-3xl th:first-child,
   table.min-w-3xl td:first-child {
-    width: 26%;
+    width: 22%;
     word-break: break-word;
     overflow-wrap: anywhere;
+    white-space: normal;
   }
 
-  table.min-w-2xl thead,
-  table.min-w-3xl thead {
-    font-size: 9px;
+  table.min-w-2xl th:not(:first-child),
+  table.min-w-2xl td:not(:first-child),
+  table.min-w-3xl th:not(:first-child),
+  table.min-w-3xl td:not(:first-child) {
+    white-space: nowrap;
   }
 }
